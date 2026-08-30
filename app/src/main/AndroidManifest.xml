@@ -9,6 +9,8 @@
     <application
         android:allowBackup="true"
         android:label="Feather Light Launcher"
+        android:icon="@drawable/ic_feather"
+        android:roundIcon="@drawable/ic_feather"
         android:supportsRtl="true"
         android:theme="@style/Theme.FeatherLightLauncher">
         <activity android:name=".LauncherSettingsActivity" android:exported="false" />
@@ -17,6 +19,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
     </application>
