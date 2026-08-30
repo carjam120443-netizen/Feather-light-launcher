@@ -21,16 +21,12 @@ import java.util.Date
 import java.util.Locale
 
 class MainActivity : Activity() {
-    private lateinit var root: LinearLayout
+    private lateinit var root: SwipeRoot
     private lateinit var content: LinearLayout
     private lateinit var clock: TextView
     private lateinit var drawerButton: TextView
     private var showingDrawer = false
     private var apps: List<AppInfo> = emptyList()
-    private var downY = 0f
-    private var downX = 0f
-    private var trackingSwipe = false
-    private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,42 +36,15 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
-        root = object : LinearLayout(this) {
-            override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-                when (ev.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> { downX = ev.rawX; downY = ev.rawY; trackingSwipe = true }
-                    MotionEvent.ACTION_MOVE -> {
-                        if (trackingSwipe) {
-                            val dx = ev.rawX - downX
-                            val dy = ev.rawY - downY
-                            if (kotlin.math.abs(dy) > touchSlop && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f) return true
-                        }
-                    }
-                    MotionEvent.ACTION_CANCEL -> trackingSwipe = false
-                }
-                return super.onInterceptTouchEvent(ev)
-            }
-            override fun onTouchEvent(event: MotionEvent): Boolean {
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> { downX = event.rawX; downY = event.rawY; trackingSwipe = true; return true }
-                    MotionEvent.ACTION_UP -> {
-                        val dx = event.rawX - downX
-                        val dy = event.rawY - downY
-                        trackingSwipe = false
-                        if (kotlin.math.abs(dy) >= 55f && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.1f) {
-                            if (!showingDrawer && dy < 0) { showDrawer(); return true }
-                            if (showingDrawer && dy > 0) { showHome(); return true }
-                        }
-                    }
-                    MotionEvent.ACTION_CANCEL -> trackingSwipe = false
-                }
-                return true
-            }
-        }.apply {
+        root = SwipeRoot(this).apply {
+            onSwipeUp = { if (!showingDrawer) showDrawer() }
+            onSwipeDown = { if (showingDrawer) showHome() }
             orientation = LinearLayout.VERTICAL
-            background = runCatching { android.app.WallpaperManager.getInstance(this@MainActivity).drawable }.getOrNull() ?: ColorDrawable(Color.rgb(248, 248, 248))
+            // Use the real Android wallpaper as the launcher background.
+            background = runCatching { android.app.WallpaperManager.getInstance(this@MainActivity).drawable }
+                .getOrNull() ?: ColorDrawable(Color.rgb(248, 248, 248))
         }
-        val overlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 30, 20, 8); setBackgroundColor(Color.argb(45, 0, 0, 0)) }
+        val overlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 30, 20, 8); setBackgroundColor(Color.argb(35, 0, 0, 0)) }
         root.addView(overlay, LinearLayout.LayoutParams(-1, 0, 1f))
         clock = TextView(this).apply { textSize = 52f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 2f, Color.BLACK) }
         overlay.addView(clock, LinearLayout.LayoutParams(-1, -2))
@@ -145,6 +114,44 @@ class MainActivity : Activity() {
 
     private fun launchApp(app: AppInfo) { runCatching { startActivity(Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER); setClassName(app.packageName, app.activityName) }) } }
     data class AppInfo(val label: String, val icon: android.graphics.drawable.Drawable, val packageName: String, val activityName: String)
+}
+
+private class SwipeRoot(context: android.content.Context) : LinearLayout(context) {
+    var onSwipeUp: (() -> Unit)? = null
+    var onSwipeDown: (() -> Unit)? = null
+    private var startX = 0f
+    private var startY = 0f
+    private var intercepting = false
+    private val slop = ViewConfiguration.get(context).scaledTouchSlop
+
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { startX = ev.x; startY = ev.y; intercepting = false }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = ev.x - startX
+                val dy = ev.y - startY
+                if (kotlin.math.abs(dy) > slop && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f) {
+                    intercepting = true
+                    return true
+                }
+            }
+        }
+        return intercepting || super.onInterceptTouchEvent(ev)
+    }
+
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_UP -> {
+                val dy = ev.y - startY
+                if (kotlin.math.abs(dy) >= 45f) {
+                    if (dy < 0) onSwipeUp?.invoke() else onSwipeDown?.invoke()
+                }
+                intercepting = false
+            }
+            MotionEvent.ACTION_CANCEL -> intercepting = false
+        }
+        return true
+    }
 }
 
 private class SimpleTextWatcher(private val callback: (String) -> Unit) : android.text.TextWatcher {
