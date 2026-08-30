@@ -38,23 +38,42 @@ jobs:
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "Building Feather Light Launcher ${VERSION_NAME} (${VERSION_CODE})"
 
-      - name: Build debug APK
+      - name: Decode persistent release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.FEATHER_KEYSTORE_B64 }}
         run: |
-          gradle assembleDebug --no-daemon \
+          test -n "$KEYSTORE_B64" || { echo "FEATHER_KEYSTORE_B64 secret is not configured"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/feather-release.jks"
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/feather-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.FEATHER_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.FEATHER_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.FEATHER_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_PASSWORD" || { echo "FEATHER_KEYSTORE_PASSWORD secret is not configured"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "FEATHER_KEY_ALIAS secret is not configured"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "FEATHER_KEY_PASSWORD secret is not configured"; exit 1; }
+          gradle assembleRelease --no-daemon \
             -PversionCode=${{ steps.version.outputs.version_code }} \
-            -PversionName=${{ steps.version.outputs.version_name }}
+            -PversionName=${{ steps.version.outputs.version_name }} \
+            -PkeystorePath="$KEYSTORE_PATH" \
+            -PkeystorePassword="$KEYSTORE_PASSWORD" \
+            -PkeyAlias="$KEY_ALIAS" \
+            -PkeyPassword="$KEY_PASSWORD"
 
       - name: Rename APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk \
-            "app/build/outputs/apk/debug/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk \
+            "app/build/outputs/apk/release/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Feather-Light-Launcher-APK
-          path: app/build/outputs/apk/debug/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk
+          path: app/build/outputs/apk/release/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -65,4 +84,4 @@ jobs:
           name: "Feather Light Launcher v${{ steps.version.outputs.version_name }}"
           generate_release_notes: true
           prerelease: true
-          files: app/build/outputs/apk/debug/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk
+          files: app/build/outputs/apk/release/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk
