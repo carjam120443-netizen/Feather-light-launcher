@@ -10,20 +10,47 @@ The project aims to provide a clean Android home-screen experience while avoidin
 
 It won't magically increase your phone's battery capacity — instead, the goal is to keep the launcher itself as efficient and lightweight as reasonably possible.
 
-## ✨ Planned Features
+## ✨ Features
 
 - 🏠 Lightweight home screen
 - 📱 Installed app drawer
-- 🔎 Fast app search
-- ⭐ Favorite apps
+- 🔎 Fast/fuzzy app search
 - 🕐 Clock and date
 - 🔋 Battery indicator
-- 🌙 Dark mode
-- 🎨 Simple customization
-- ⚡ Battery-conscious animations
+- 👆 Swipe-up app drawer gesture
+- 🧭 Swipe-down return gesture
+- 🕘 Lightweight recent-app dock
+- 🎨 Dock themes: Feather Glass, Windows Dock, Mac Dock, and Aero Dock
+- 🪶 Bundled Feather Light wallpapers
+- 🖼️ Wallpaper picker in Launcher Settings
+- ⚙️ Launcher settings
+- 📐 App drawer column control
 - 💤 Minimal background activity
 - 🚫 No unnecessary telemetry
 - 📦 Small and efficient app footprint
+
+## 🪶 Feather Wallpapers
+
+Feather Light includes small, original gradient/vector-style wallpaper backgrounds bundled directly with the launcher. They are designed for the project rather than downloaded at runtime, helping keep the launcher responsive and offline-friendly.
+
+Available styles:
+
+- 🌑 Midnight Feather
+- 💙 Blue Feather
+- 🌈 Color Feather
+- 🌌 Aurora Feather
+- 🤍 Minimal Feather
+
+### Wallpaper research & references
+
+The project team researched feather imagery and wallpaper licensing using these sites while designing the bundled backgrounds. **The third-party photographs below are not bundled in the APK and are not claimed as Feather Light assets.**
+
+- **Pedro Vergara (pedrovyc) — Unsplash:** “White feather in black background” — https://unsplash.com/photos/white-feather-in-black-background-t44f-5W0ECo
+- **Sponchia — Pixabay:** “Feather, Ease, Slightly” — https://pixabay.com/photos/feather-ease-slightly-blue-airy-3010848/
+- **A_Different_Perspective — Pixabay:** “Feather Texture Background” — https://pixabay.com/photos/feather-texture-background-macro-1520418/
+
+Unsplash: https://unsplash.com/  
+Pixabay: https://pixabay.com/
 
 ## 🚧 Status
 
