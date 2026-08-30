@@ -56,7 +56,7 @@ jobs:
           printf '%s' "$CLEAN_B64" | base64 --decode > "$RUNNER_TEMP/feather-release.jks"
           test -s "$RUNNER_TEMP/feather-release.jks" || { echo "Decoded keystore is empty"; exit 1; }
 
-      - name: Build signed release APK
+      - name: Prepare Gradle signing keystore
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/feather-release.jks
           KEYSTORE_PASSWORD_SECRET: ${{ secrets.FEATHER_KEYSTORE_PASSWORD }}
@@ -67,13 +67,47 @@ jobs:
           set -euo pipefail
           test -n "$KEY_ALIAS" || { echo "FEATHER_KEY_ALIAS secret is not configured"; exit 1; }
 
-          # GitHub Actions cannot store an intentionally empty secret reliably.
-          # Set either password secret to the literal value BLANK when the
-          # corresponding keystore/key password is empty.
-          KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD_SECRET"
-          KEY_PASSWORD="$KEY_PASSWORD_SECRET"
-          if [ "$KEYSTORE_PASSWORD" = "BLANK" ]; then KEYSTORE_PASSWORD=""; fi
-          if [ "$KEY_PASSWORD" = "BLANK" ]; then KEY_PASSWORD=""; fi
+          SOURCE_STORE_PASSWORD="$KEYSTORE_PASSWORD_SECRET"
+          SOURCE_KEY_PASSWORD="$KEY_PASSWORD_SECRET"
+          if [ "$SOURCE_STORE_PASSWORD" = "BLANK" ]; then SOURCE_STORE_PASSWORD=""; fi
+          if [ "$SOURCE_KEY_PASSWORD" = "BLANK" ]; then SOURCE_KEY_PASSWORD=""; fi
+
+          # Android Gradle Plugin expects a usable signing password. For a
+          # passwordless source keystore, re-wrap the same signing key into a
+          # temporary password-protected keystore. The persistent key itself
+          # never changes, so future releases remain update-compatible.
+          NORMALIZED_PATH="$RUNNER_TEMP/feather-release-signing.jks"
+          DEST_PASSWORD="$(openssl rand -hex 24)"
+
+          keytool -importkeystore \
+            -noprompt \
+            -srckeystore "$KEYSTORE_PATH" \
+            -srcstoretype JKS \
+            -srcstorepass "$SOURCE_STORE_PASSWORD" \
+            -srcalias "$KEY_ALIAS" \
+            -srckeypass "$SOURCE_KEY_PASSWORD" \
+            -destkeystore "$NORMALIZED_PATH" \
+            -deststoretype JKS \
+            -deststorepass "$DEST_PASSWORD" \
+            -destkeypass "$DEST_PASSWORD" \
+            -destalias "$KEY_ALIAS"
+
+          test -s "$NORMALIZED_PATH" || { echo "Failed to create normalized signing keystore"; exit 1; }
+
+          echo "normalized_keystore_path=$NORMALIZED_PATH" >> "$GITHUB_OUTPUT"
+          echo "normalized_keystore_password=$DEST_PASSWORD" >> "$GITHUB_OUTPUT"
+        id: signing
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PATH: ${{ steps.signing.outputs.normalized_keystore_path }}
+          KEYSTORE_PASSWORD: ${{ steps.signing.outputs.normalized_keystore_password }}
+          KEY_ALIAS: ${{ secrets.FEATHER_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ steps.signing.outputs.normalized_keystore_password }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KEY_ALIAS" || { echo "FEATHER_KEY_ALIAS secret is not configured"; exit 1; }
 
           gradle assembleRelease --no-daemon \
             -PversionCode=${{ steps.version.outputs.version_code }} \
