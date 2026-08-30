@@ -1,16 +1,20 @@
 package com.carjam.featherlightlauncher
 
+import android.app.Activity
+import android.app.WallpaperManager
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.EditText
 import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -18,30 +22,36 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : android.app.Activity() {
+class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var clock: TextView
+    private lateinit var drawerButton: TextView
     private var showingDrawer = false
     private var apps: List<AppInfo> = emptyList()
 
     private val clockUpdater = object : Runnable {
         override fun run() {
-            if (::clock.isInitialized) {
-                clock.text = SimpleDateFormat("h:mm", Locale.getDefault()).format(Date())
-            }
+            if (::clock.isInitialized) clock.text = SimpleDateFormat("h:mm", Locale.getDefault()).format(Date())
             handler.postDelayed(this, 30_000)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.BLACK
         apps = loadApps()
-        buildShell()
+        buildUi()
         showHome()
         handler.post(clockUpdater)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::root.isInitialized) {
+            apps = loadApps()
+            if (!showingDrawer) showHome()
+        }
     }
 
     override fun onDestroy() {
@@ -49,148 +59,166 @@ class MainActivity : android.app.Activity() {
         super.onDestroy()
     }
 
-    private fun buildShell() {
-        val root = LinearLayout(this).apply {
+    private fun buildUi() {
+        root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(248, 248, 248))
+            background = runCatching { WallpaperManager.getInstance(this@MainActivity).drawable }.getOrNull()
+                ?: ColorDrawable(Color.rgb(248, 248, 248))
         }
+
+        val overlay = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 30, 20, 8)
+            setBackgroundColor(Color.argb(45, 0, 0, 0))
+        }
+        root.addView(overlay, LinearLayout.LayoutParams(-1, 0, 1f))
 
         clock = TextView(this).apply {
-            textSize = 54f
-            setTextColor(Color.rgb(25, 25, 25))
+            textSize = 52f
+            setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(16, 36, 16, 4)
+            setShadowLayer(8f, 0f, 2f, Color.BLACK)
         }
-        root.addView(clock, LinearLayout.LayoutParams(-1, -2))
+        overlay.addView(clock, LinearLayout.LayoutParams(-1, -2))
 
-        content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20, 12, 20, 12)
-        }
-        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        overlay.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        val drawerButton = Button(this).apply {
-            text = "Apps"
+        drawerButton = TextView(this).apply {
+            text = "⌃   Apps"
             textSize = 16f
-            setOnClickListener {
-                if (showingDrawer) showHome() else showDrawer()
-            }
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setShadowLayer(5f, 0f, 1f, Color.BLACK)
+            setPadding(12, 14, 12, 14)
+            isClickable = true
+            setOnClickListener { if (showingDrawer) showHome() else showDrawer() }
         }
-        root.addView(drawerButton, LinearLayout.LayoutParams(-1, 58))
+        overlay.addView(drawerButton, LinearLayout.LayoutParams(-1, 58))
         setContentView(root)
     }
 
     private fun showHome() {
         showingDrawer = false
+        drawerButton.text = "⌃   Apps"
         content.removeAllViews()
 
         val date = TextView(this).apply {
             text = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date())
             textSize = 17f
             gravity = Gravity.CENTER
-            setTextColor(Color.DKGRAY)
-            setPadding(8, 0, 8, 24)
+            setTextColor(Color.WHITE)
+            setShadowLayer(5f, 0f, 1f, Color.BLACK)
+            setPadding(8, 0, 8, 10)
         }
         content.addView(date)
 
         val battery = getSystemService(BATTERY_SERVICE) as BatteryManager
         val level = battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        val batteryText = TextView(this).apply {
+        val status = TextView(this).apply {
             text = "🔋 $level%"
-            textSize = 16f
+            textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.DKGRAY)
-            setPadding(8, 8, 8, 20)
+            setTextColor(Color.WHITE)
+            setShadowLayer(4f, 0f, 1f, Color.BLACK)
         }
-        content.addView(batteryText)
+        content.addView(status)
 
-        val favorites = TextView(this).apply {
-            text = if (apps.isEmpty()) "No apps found yet" else "Tap Apps to open your app drawer"
-            textSize = 18f
+        val favorites = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setTextColor(Color.DKGRAY)
-            setPadding(8, 40, 8, 8)
+            setPadding(0, 12, 0, 16)
         }
-        content.addView(favorites, LinearLayout.LayoutParams(-1, 0, 1f))
+        apps.take(5).forEach { app -> favorites.addView(createAppView(app, 72)) }
+        content.addView(favorites, LinearLayout.LayoutParams(-1, -2))
+
+        val hint = TextView(this).apply {
+            text = "Swipe up or tap Apps"
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setShadowLayer(4f, 0f, 1f, Color.BLACK)
+        }
+        content.addView(hint, LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun showDrawer() {
         showingDrawer = true
+        drawerButton.text = "⌄   Home"
         content.removeAllViews()
 
         val search = EditText(this).apply {
             hint = "Search apps"
             setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
             setPadding(18, 8, 18, 8)
+            setBackgroundColor(Color.argb(100, 0, 0, 0))
         }
         content.addView(search, LinearLayout.LayoutParams(-1, 58))
 
         val scroll = ScrollView(this)
-        val grid = GridLayout(this).apply {
-            columnCount = 4
-            useDefaultMargins = true
-            alignmentMode = GridLayout.ALIGN_MARGINS
-            setPadding(0, 12, 0, 20)
-        }
+        val grid = GridLayout(this).apply { columnCount = 4; useDefaultMargins = true; setPadding(0, 12, 0, 20) }
         scroll.addView(grid, ViewGroup.LayoutParams(-1, -2))
         content.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         fun render(filter: String = "") {
             grid.removeAllViews()
-            apps.filter { it.label.contains(filter, ignoreCase = true) }.forEach { app ->
-                val button = TextView(this).apply {
-                    text = "${app.icon}\n${app.label}"
-                    textSize = 14f
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.rgb(25, 25, 25))
-                    setPadding(4, 12, 4, 12)
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener { launchApp(app) }
-                }
-                grid.addView(button, GridLayout.LayoutParams().apply {
+            apps.filter { it.label.contains(filter, true) }.forEach { app ->
+                grid.addView(createAppView(app, 84), GridLayout.LayoutParams().apply {
                     width = 0
-                    height = GridLayout.LayoutParams.WRAP_CONTENT
                     columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
                 })
             }
         }
-
         render()
         search.addTextChangedListener(SimpleTextWatcher { render(it) })
     }
 
+    private fun createAppView(app: AppInfo, size: Int): View {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setPadding(4, 6, 4, 6)
+            setOnClickListener { launchApp(app) }
+        }
+        val icon = ImageView(this).apply {
+            setImageDrawable(app.icon)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }
+        box.addView(icon, LinearLayout.LayoutParams(size, size))
+        val label = TextView(this).apply {
+            text = app.label
+            textSize = 12f
+            gravity = Gravity.CENTER
+            maxLines = 2
+            setTextColor(Color.WHITE)
+            setShadowLayer(4f, 0f, 1f, Color.BLACK)
+        }
+        box.addView(label, LinearLayout.LayoutParams(-1, -2))
+        return box
+    }
+
     private fun loadApps(): List<AppInfo> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return packageManager.queryIntentActivities(intent, 0)
-            .mapNotNull { resolve ->
-                val info = resolve.activityInfo ?: return@mapNotNull null
-                AppInfo(
-                    label = info.loadLabel(packageManager).toString(),
-                    icon = "📱",
-                    packageName = info.packageName,
-                    activityName = info.name
-                )
-            }
-            .distinctBy { "${it.packageName}/${it.activityName}" }
-            .sortedBy { it.label.lowercase(Locale.getDefault()) }
+        return packageManager.queryIntentActivities(intent, 0).mapNotNull { resolve ->
+            val info = resolve.activityInfo ?: return@mapNotNull null
+            AppInfo(info.loadLabel(packageManager).toString(), info.loadIcon(packageManager), info.packageName, info.name)
+        }.distinctBy { "${it.packageName}/${it.activityName}" }.sortedBy { it.label.lowercase(Locale.getDefault()) }
     }
 
     private fun launchApp(app: AppInfo) {
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            setClassName(app.packageName, app.activityName)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching {
+            startActivity(Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                setClassName(app.packageName, app.activityName)
+            })
         }
-        runCatching { startActivity(intent) }
     }
 
-    data class AppInfo(
-        val label: String,
-        val icon: String,
-        val packageName: String,
-        val activityName: String
-    )
+    data class AppInfo(val label: String, val icon: android.graphics.drawable.Drawable, val packageName: String, val activityName: String)
 }
 
 private class SimpleTextWatcher(private val callback: (String) -> Unit) : android.text.TextWatcher {
