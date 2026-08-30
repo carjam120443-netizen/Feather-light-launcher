@@ -46,11 +46,8 @@ jobs:
           set -euo pipefail
           test -n "$KEYSTORE_B64" || { echo "FEATHER_KEYSTORE_B64 secret is not configured"; exit 1; }
 
-          # Remove harmless whitespace/newlines so a wrapped Base64 value works.
           CLEAN_B64="$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')"
 
-          # Validate before writing the keystore. This gives a useful error instead
-          # of allowing a malformed secret to reach the Android signing step.
           if ! printf '%s' "$CLEAN_B64" | base64 --decode >/dev/null 2>&1; then
             echo "FEATHER_KEYSTORE_B64 is not valid Base64. It must contain the Base64-encoded contents of the persistent .jks/.keystore file." >&2
             exit 1
@@ -67,9 +64,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.FEATHER_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$KEYSTORE_PASSWORD" || { echo "FEATHER_KEYSTORE_PASSWORD secret is not configured"; exit 1; }
           test -n "$KEY_ALIAS" || { echo "FEATHER_KEY_ALIAS secret is not configured"; exit 1; }
-          test -n "$KEY_PASSWORD" || { echo "FEATHER_KEY_PASSWORD secret is not configured"; exit 1; }
+
+          # The Feather Light release keystore may intentionally have a blank
+          # keystore password and/or blank key password. Do not reject empty
+          # password secrets; Gradle/keytool will validate the supplied values.
           gradle assembleRelease --no-daemon \
             -PversionCode=${{ steps.version.outputs.version_code }} \
             -PversionName=${{ steps.version.outputs.version_name }} \
