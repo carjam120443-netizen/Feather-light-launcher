@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -106,7 +105,7 @@ class MainActivity : android.app.Activity() {
         content.addView(batteryText)
 
         val favorites = TextView(this).apply {
-            text = if (apps.isEmpty()) "No apps found yet" else "Swipe up or tap Apps to open your app drawer"
+            text = if (apps.isEmpty()) "No apps found yet" else "Tap Apps to open your app drawer"
             textSize = 18f
             gravity = Gravity.CENTER
             setTextColor(Color.DKGRAY)
@@ -121,7 +120,7 @@ class MainActivity : android.app.Activity() {
 
         val search = EditText(this).apply {
             hint = "Search apps"
-            singleLine = true
+            setSingleLine(true)
             setPadding(18, 8, 18, 8)
         }
         content.addView(search, LinearLayout.LayoutParams(-1, 58))
