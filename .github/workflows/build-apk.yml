@@ -41,9 +41,23 @@ jobs:
       - name: Decode persistent release keystore
         env:
           KEYSTORE_B64: ${{ secrets.FEATHER_KEYSTORE_B64 }}
+        shell: bash
         run: |
+          set -euo pipefail
           test -n "$KEYSTORE_B64" || { echo "FEATHER_KEYSTORE_B64 secret is not configured"; exit 1; }
-          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/feather-release.jks"
+
+          # Remove harmless whitespace/newlines so a wrapped Base64 value works.
+          CLEAN_B64="$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')"
+
+          # Validate before writing the keystore. This gives a useful error instead
+          # of allowing a malformed secret to reach the Android signing step.
+          if ! printf '%s' "$CLEAN_B64" | base64 --decode >/dev/null 2>&1; then
+            echo "FEATHER_KEYSTORE_B64 is not valid Base64. It must contain the Base64-encoded contents of the persistent .jks/.keystore file." >&2
+            exit 1
+          fi
+
+          printf '%s' "$CLEAN_B64" | base64 --decode > "$RUNNER_TEMP/feather-release.jks"
+          test -s "$RUNNER_TEMP/feather-release.jks" || { echo "Decoded keystore is empty"; exit 1; }
 
       - name: Build signed release APK
         env:
@@ -52,6 +66,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.FEATHER_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.FEATHER_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           test -n "$KEYSTORE_PASSWORD" || { echo "FEATHER_KEYSTORE_PASSWORD secret is not configured"; exit 1; }
           test -n "$KEY_ALIAS" || { echo "FEATHER_KEY_ALIAS secret is not configured"; exit 1; }
           test -n "$KEY_PASSWORD" || { echo "FEATHER_KEY_PASSWORD secret is not configured"; exit 1; }
