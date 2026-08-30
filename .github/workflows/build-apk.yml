@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -28,13 +28,41 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+      - name: Set build version
+        id: version
+        shell: bash
+        run: |
+          VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          VERSION_NAME="0.1.${GITHUB_RUN_NUMBER}"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Building Feather Light Launcher ${VERSION_NAME} (${VERSION_CODE})"
 
-      - name: Upload APK
+      - name: Build debug APK
+        run: |
+          gradle assembleDebug --no-daemon \
+            -PversionCode=${{ steps.version.outputs.version_code }} \
+            -PversionName=${{ steps.version.outputs.version_name }}
+
+      - name: Rename APK
+        shell: bash
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "app/build/outputs/apk/debug/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Feather-Light-Launcher-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.version.outputs.version_name }}"
+          name: "Feather Light Launcher v${{ steps.version.outputs.version_name }}"
+          generate_release_notes: true
+          prerelease: true
+          files: app/build/outputs/apk/debug/FeatherLightLauncher-v${{ steps.version.outputs.version_name }}.apk
