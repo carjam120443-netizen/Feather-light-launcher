@@ -1,6 +1,6 @@
 # 🪶 Feather Light Launcher
 
-A lightweight, battery-conscious Android launcher designed to keep your home screen **simple, fast, and efficient**.
+A lightweight, battery-conscious Android launcher designed to be **fast, simple, and resource-efficient**. 🪶🔋
 
 ## 🎯 Goal
 
