@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.GridLayout
@@ -27,6 +28,9 @@ class MainActivity : Activity() {
     private var showingDrawer = false
     private var apps: List<AppInfo> = emptyList()
     private var downY = 0f
+    private var downX = 0f
+    private var trackingSwipe = false
+    private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,22 +40,41 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
-        root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = runCatching { android.app.WallpaperManager.getInstance(this@MainActivity).drawable }.getOrNull()
-                ?: ColorDrawable(Color.rgb(248, 248, 248))
-            setOnTouchListener { _, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> { downY = event.rawY; false }
-                    MotionEvent.ACTION_UP -> {
-                        val delta = event.rawY - downY
-                        if (!showingDrawer && delta < -100f) { showDrawer(); true }
-                        else if (showingDrawer && delta > 100f) { showHome(); true }
-                        else false
+        root = object : LinearLayout(this) {
+            override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { downX = ev.rawX; downY = ev.rawY; trackingSwipe = true }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (trackingSwipe) {
+                            val dx = ev.rawX - downX
+                            val dy = ev.rawY - downY
+                            if (kotlin.math.abs(dy) > touchSlop && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f) return true
+                        }
                     }
-                    else -> false
+                    MotionEvent.ACTION_CANCEL -> trackingSwipe = false
                 }
+                return super.onInterceptTouchEvent(ev)
             }
+            override fun onTouchEvent(event: MotionEvent): Boolean {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { downX = event.rawX; downY = event.rawY; trackingSwipe = true; return true }
+                    MotionEvent.ACTION_UP -> {
+                        val dx = event.rawX - downX
+                        val dy = event.rawY - downY
+                        trackingSwipe = false
+                        if (kotlin.math.abs(dy) >= 80f && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f) {
+                            if (!showingDrawer && dy < 0) showDrawer()
+                            else if (showingDrawer && dy > 0) showHome()
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> trackingSwipe = false
+                }
+                return true
+            }
+        }.apply {
+            orientation = LinearLayout.VERTICAL
+            background = runCatching { android.app.WallpaperManager.getInstance(this@MainActivity).drawable }.getOrNull() ?: ColorDrawable(Color.rgb(248, 248, 248))
         }
         val overlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 30, 20, 8); setBackgroundColor(Color.argb(45, 0, 0, 0)) }
         root.addView(overlay, LinearLayout.LayoutParams(-1, 0, 1f))
