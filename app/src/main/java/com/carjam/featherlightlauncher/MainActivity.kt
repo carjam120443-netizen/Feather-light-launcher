@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -30,6 +31,7 @@ class MainActivity : Activity() {
     private lateinit var drawerButton: TextView
     private var showingDrawer = false
     private var apps: List<AppInfo> = emptyList()
+    private var downY = 0f
 
     private val clockUpdater = object : Runnable {
         override fun run() {
@@ -62,8 +64,27 @@ class MainActivity : Activity() {
     private fun buildUi() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = runCatching { WallpaperManager.getInstance(this@MainActivity).drawable }.getOrNull()
-                ?: ColorDrawable(Color.rgb(248, 248, 248))
+            background = runCatching { WallpaperManager.getInstance(this@MainActivity).drawable }
+                .getOrNull() ?: ColorDrawable(Color.rgb(248, 248, 248))
+            setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downY = event.rawY
+                        false
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        val deltaY = event.rawY - downY
+                        if (!showingDrawer && deltaY < -100f) {
+                            showDrawer()
+                            true
+                        } else if (showingDrawer && deltaY > 100f) {
+                            showHome()
+                            true
+                        } else false
+                    }
+                    else -> false
+                }
+            }
         }
 
         val overlay = LinearLayout(this).apply {
@@ -129,11 +150,11 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(0, 12, 0, 16)
         }
-        apps.take(5).forEach { app -> favorites.addView(createAppView(app, 72)) }
+        apps.take(5).forEach { app -> favorites.addView(createAppView(app, 64)) }
         content.addView(favorites, LinearLayout.LayoutParams(-1, -2))
 
         val hint = TextView(this).apply {
-            text = "Swipe up or tap Apps"
+            text = "Swipe up for apps"
             textSize = 15f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
@@ -165,7 +186,7 @@ class MainActivity : Activity() {
         fun render(filter: String = "") {
             grid.removeAllViews()
             apps.filter { it.label.contains(filter, true) }.forEach { app ->
-                grid.addView(createAppView(app, 84), GridLayout.LayoutParams().apply {
+                grid.addView(createAppView(app, 76), GridLayout.LayoutParams().apply {
                     width = 0
                     columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
                 })
@@ -210,12 +231,10 @@ class MainActivity : Activity() {
     }
 
     private fun launchApp(app: AppInfo) {
-        runCatching {
-            startActivity(Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                setClassName(app.packageName, app.activityName)
-            })
-        }
+        runCatching { startActivity(Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setClassName(app.packageName, app.activityName)
+        }) }
     }
 
     data class AppInfo(val label: String, val icon: android.graphics.drawable.Drawable, val packageName: String, val activityName: String)
