@@ -62,10 +62,9 @@ class MainActivity : Activity() {
                         val dx = event.rawX - downX
                         val dy = event.rawY - downY
                         trackingSwipe = false
-                        if (kotlin.math.abs(dy) >= 80f && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f) {
-                            if (!showingDrawer && dy < 0) showDrawer()
-                            else if (showingDrawer && dy > 0) showHome()
-                            return true
+                        if (kotlin.math.abs(dy) >= 55f && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.1f) {
+                            if (!showingDrawer && dy < 0) { showDrawer(); return true }
+                            if (showingDrawer && dy > 0) { showHome(); return true }
                         }
                     }
                     MotionEvent.ACTION_CANCEL -> trackingSwipe = false
