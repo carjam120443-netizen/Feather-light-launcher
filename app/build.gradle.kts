@@ -15,9 +15,25 @@ android {
         versionName = providers.gradleProperty("versionName").getOrElse("0.1.0")
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = providers.gradleProperty("keystorePath")
+            val keystorePassword = providers.gradleProperty("keystorePassword")
+            val keyAlias = providers.gradleProperty("keyAlias")
+            val keyPassword = providers.gradleProperty("keyPassword")
+            if (keystorePath.isPresent && keystorePassword.isPresent && keyAlias.isPresent && keyPassword.isPresent) {
+                storeFile = file(keystorePath.get())
+                storePassword = keystorePassword.get()
+                this.keyAlias = keyAlias.get()
+                this.keyPassword = keyPassword.get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
