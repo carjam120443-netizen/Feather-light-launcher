@@ -1,6 +1,7 @@
 package com.carjam.featherlightlauncher
 
 import android.app.Activity
+import android.app.WallpaperManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -30,9 +31,19 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         apps = loadApps()
         buildUi()
         showHome()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh the wallpaper if the user changed it while another app was open.
+        if (::root.isInitialized) {
+            root.background = runCatching { WallpaperManager.getInstance(this).drawable }.getOrNull()
+                ?: ColorDrawable(Color.rgb(248, 248, 248))
+        }
     }
 
     private fun buildUi() {
@@ -40,9 +51,8 @@ class MainActivity : Activity() {
             onSwipeUp = { if (!showingDrawer) showDrawer() }
             onSwipeDown = { if (showingDrawer) showHome() }
             orientation = LinearLayout.VERTICAL
-            // Use the real Android wallpaper as the launcher background.
-            background = runCatching { android.app.WallpaperManager.getInstance(this@MainActivity).drawable }
-                .getOrNull() ?: ColorDrawable(Color.rgb(248, 248, 248))
+            background = runCatching { WallpaperManager.getInstance(this@MainActivity).drawable }.getOrNull()
+                ?: ColorDrawable(Color.rgb(248, 248, 248))
         }
         val overlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 30, 20, 8); setBackgroundColor(Color.argb(35, 0, 0, 0)) }
         root.addView(overlay, LinearLayout.LayoutParams(-1, 0, 1f))
