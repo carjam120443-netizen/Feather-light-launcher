@@ -59,16 +59,22 @@ jobs:
       - name: Build signed release APK
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/feather-release.jks
-          KEYSTORE_PASSWORD: ${{ secrets.FEATHER_KEYSTORE_PASSWORD }}
+          KEYSTORE_PASSWORD_SECRET: ${{ secrets.FEATHER_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.FEATHER_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.FEATHER_KEY_PASSWORD }}
+          KEY_PASSWORD_SECRET: ${{ secrets.FEATHER_KEY_PASSWORD }}
+        shell: bash
         run: |
           set -euo pipefail
           test -n "$KEY_ALIAS" || { echo "FEATHER_KEY_ALIAS secret is not configured"; exit 1; }
 
-          # The Feather Light release keystore may intentionally have a blank
-          # keystore password and/or blank key password. Do not reject empty
-          # password secrets; Gradle/keytool will validate the supplied values.
+          # GitHub Actions cannot store an intentionally empty secret reliably.
+          # Set either password secret to the literal value BLANK when the
+          # corresponding keystore/key password is empty.
+          KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD_SECRET"
+          KEY_PASSWORD="$KEY_PASSWORD_SECRET"
+          if [ "$KEYSTORE_PASSWORD" = "BLANK" ]; then KEYSTORE_PASSWORD=""; fi
+          if [ "$KEY_PASSWORD" = "BLANK" ]; then KEY_PASSWORD=""; fi
+
           gradle assembleRelease --no-daemon \
             -PversionCode=${{ steps.version.outputs.version_code }} \
             -PversionName=${{ steps.version.outputs.version_name }} \
