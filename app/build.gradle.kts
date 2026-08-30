@@ -21,11 +21,12 @@ android {
             val keystorePassword = providers.gradleProperty("keystorePassword")
             val keyAlias = providers.gradleProperty("keyAlias")
             val keyPassword = providers.gradleProperty("keyPassword")
+
             if (keystorePath.isPresent && keystorePassword.isPresent && keyAlias.isPresent && keyPassword.isPresent) {
                 storeFile = file(keystorePath.get())
-                storePassword = keystorePassword.get()
+                storePassword = if (keystorePassword.get() == "BLANK") "" else keystorePassword.get()
                 this.keyAlias = keyAlias.get()
-                this.keyPassword = keyPassword.get()
+                this.keyPassword = if (keyPassword.get() == "BLANK") "" else keyPassword.get()
             }
         }
     }
